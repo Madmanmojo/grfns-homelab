@@ -1,0 +1,191 @@
+---
+theme: dark
+
+server:
+  address: tcp://0.0.0.0:9091
+
+log:
+  level: info
+  format: json
+  file_path: /config/authelia.log
+  keep_stdout: true
+
+# Secrets loaded from environment variables (AUTHELIA_JWT_SECRET, etc.)
+
+authentication_backend:
+  ldap:
+    address: ldap://lldap:3890
+    base_dn: dc=grfns,dc=com
+    additional_users_dn: ou=people
+    users_filter: (&({username_attribute}={input})(objectClass=person))
+    additional_groups_dn: ou=groups
+    groups_filter: (member={dn})
+    user: uid=admin,ou=people,dc=grfns,dc=com
+    attributes:
+      username: uid
+      group_name: cn
+      mail: mail
+      display_name: displayName
+
+session:
+  name: authelia_session
+  expiration: 12h
+  inactivity: 1h
+  remember_me: 1M
+  cookies:
+    - domain: grfns.com
+      authelia_url: https://auth.grfns.com
+      default_redirection_url: https://watch.grfns.com
+      same_site: lax
+
+storage:
+  local:
+    path: /config/db/authelia.db
+
+notifier:
+  # Writes verification codes/reset links to a local file.
+  # Read with: cat /Users/jarvis/docker/authelia/config/notification.txt
+  # Upgrade to SMTP later for email delivery.
+  filesystem:
+    filename: /config/notification.txt
+
+identity_providers:
+  oidc:
+    jwks:
+      - key_id: '1'
+        algorithm: 'RS256'
+        use: 'sig'
+        key: |
+          -----BEGIN PRIVATE KEY-----
+          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
+          X6JmJu8zkWE++SDREo3R5gCUCucHv6Q=
+          -----END PRIVATE KEY-----
+    clients:
+      - client_id: 'jellyfin'
+        client_name: 'Jellyfin'
+        client_secret: '$pbkdf2-sha512$310000$zLXONNAAH1.HkJC0EK8iMg$.7vPW/EErWy7F0AO9KspbHC4hplopcdXPddB7zD4rcgn6MZKT/d045PjfGIKDaCFZ0iq6/mPg6Ts0N7EgAhPsQ'
+        public: false
+        authorization_policy: 'one_factor'
+        redirect_uris:
+          - 'https://watch.grfns.com/sso/OID/redirect/authelia'
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'email'
+          - 'groups'
+        userinfo_signed_response_alg: 'none'
+        token_endpoint_auth_method: 'client_secret_post'
+        claims_policy: 'jellyfin'
+
+      - client_id: 'romm'
+        client_name: 'RomM'
+        client_secret: '$pbkdf2-sha512$310000$GV0kmzc7C6DPICoSqe0sKw$6iSYCeP3DuMjXNjn1BHoKqtQG5rrO1mE.kzCDGMAHgjeffgJSe4PVl19sG9L/da2JeD/8zjya32yMAqJMRcYrQ'
+        public: false
+        authorization_policy: 'one_factor'
+        redirect_uris:
+          - 'https://play.grfns.com/api/oauth/openid'
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'email'
+        response_types:
+          - 'code'
+        response_modes:
+          - 'form_post'
+        userinfo_signed_response_alg: 'none'
+        token_endpoint_auth_method: 'client_secret_basic'
+        claims_policy: 'romm'
+
+
+    claims_policies:
+      jellyfin:
+        id_token:
+          - 'email'
+          - 'email_verified'
+          - 'preferred_username'
+          - 'name'
+          - 'groups'
+      romm:
+        id_token:
+          - 'email'
+          - 'email_verified'
+          - 'preferred_username'
+          - 'name'
+
+access_control:
+  default_policy: deny
+
+  rules:
+    # Authelia portal itself — always bypass
+    - domain: auth.grfns.com
+      policy: bypass
+
+    # Admin (you) — full access to everything
+    - domain:
+        - "watch.grfns.com"
+        - "read.grfns.com"
+        - "requests.grfns.com"
+        - "media.grfns.com"
+        - "play.grfns.com"
+      subject: "group:admins"
+      policy: one_factor
+
+    # Friends group — can watch and request, not play or read
+    - domain:
+        - "watch.grfns.com"
+        - "requests.grfns.com"
+      subject: "group:friends"
+      policy: one_factor
+
+    # Readers group — comics only
+    - domain: "read.grfns.com"
+      subject: "group:readers"
+      policy: one_factor

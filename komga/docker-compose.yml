@@ -1,0 +1,36 @@
+# Komga - comics server (OPDS for Panels)
+# Komf - metadata fetcher (Comic Vine, series matching)
+# Comics library: /Volumes/Orange/Comics
+
+services:
+  komga:
+    image: gotson/komga:latest
+    container_name: komga
+    restart: unless-stopped
+    environment:
+      - TZ=America/New_York
+    ports:
+      - "127.0.0.1:25600:25600"
+    volumes:
+      - /Users/jarvis/.komga/config:/config
+      - /Users/jarvis/.komga/data:/data
+      # Comics library (Orange) - read-write so Komga can update metadata / write back to files
+      - /Volumes/Orange/Comics:/comics
+      # Optional: import folder (read-only is fine)
+      - /Volumes/MediaStorage/syncthing-incoming/Media:/import:ro
+
+  komf:
+    image: sndxr/komf:latest
+    container_name: komf
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3801:8085"   # Komf listens on 8085 inside container
+    environment:
+      # Use Komga service name so Komf can reach it on the same network
+      - KOMF_KOMGA_BASE_URI=http://komga:25600
+      - KOMF_KOMGA_USER=${KOMF_KOMGA_USER}
+      - KOMF_KOMGA_PASSWORD=${KOMF_KOMGA_PASSWORD}
+    volumes:
+      - /Users/jarvis/.komf:/config
+    depends_on:
+      - komga

@@ -1,0 +1,76 @@
+# Caddy reverse proxy — grfns.com services
+# Sits between Cloudflare tunnel (port 80) and all apps
+# Forward auth via Authelia for all protected routes
+
+(authelia_auth) {
+    forward_auth authelia:9091 {
+        uri /api/authz/forward-auth
+        copy_headers Remote-User Remote-Groups Remote-Name Remote-Email
+        header_up X-Forwarded-Proto https
+        header_up X-Forwarded-Uri {http.request.uri}
+        header_up Cookie {http.request.header.Cookie}
+    }
+}
+
+# ── Jellyfin ─────────────────────────────────────────────────
+:80 {
+    # Jellyfin API calls carry their own MediaBrowser token — bypass Authelia,
+    # let Jellyfin validate its own token. Browser page loads still require an
+    # Authelia session (no Authorization header → hits the @watch handler below).
+    @watch_api {
+        host watch.grfns.com
+        header Authorization MediaBrowser*
+    }
+    handle @watch_api {
+        reverse_proxy host.docker.internal:8096
+    }
+
+    @watch host watch.grfns.com
+    handle @watch {
+        import authelia_auth
+        reverse_proxy host.docker.internal:8096
+    }
+
+    # ── Komga ────────────────────────────────────────────────
+    @read host read.grfns.com
+    handle @read {
+        import authelia_auth
+        reverse_proxy host.docker.internal:25600
+    }
+
+    # ── Jellyseerr ───────────────────────────────────────────
+    @requests host requests.grfns.com
+    handle @requests {
+        import authelia_auth
+        reverse_proxy host.docker.internal:5055
+    }
+
+    # ── media-center-ai ──────────────────────────────────────
+    @media host media.grfns.com
+    handle @media {
+        import authelia_auth
+        reverse_proxy host.docker.internal:8000
+    }
+
+    # ── Romm ─────────────────────────────────────────────────
+    @play host play.grfns.com
+    handle @play {
+        import authelia_auth
+        reverse_proxy host.docker.internal:8998 {
+            header_down -WWW-Authenticate
+        }
+    }
+
+    # ── Authelia portal — direct, no forward auth ────────────
+    @auth host auth.grfns.com
+    handle @auth {
+        reverse_proxy authelia:9091 {
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    # Catch-all — reject unmatched hostnames
+    handle {
+        respond 404
+    }
+}

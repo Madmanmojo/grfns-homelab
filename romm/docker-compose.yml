@@ -1,0 +1,54 @@
+services:
+  romm-db:
+    image: mariadb:latest
+    container_name: romm-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - ./db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - romm-net
+
+  romm:
+    image: rommapp/romm:latest
+    container_name: romm
+    restart: unless-stopped
+    environment:
+      - DB_HOST=romm-db
+      - DB_NAME=${MYSQL_DATABASE}
+      - DB_USER=${MYSQL_USER}
+      - DB_PASSWD=${MYSQL_PASSWORD}
+      - ROMM_AUTH_SECRET_KEY=${ROMM_AUTH_SECRET_KEY}
+      - IGDB_CLIENT_ID=${IGDB_CLIENT_ID}
+      - IGDB_CLIENT_SECRET=${IGDB_CLIENT_SECRET}
+      - OIDC_ENABLED=true
+      - OIDC_PROVIDER=authelia
+      - OIDC_CLIENT_ID=romm
+      - OIDC_CLIENT_SECRET=9df37c4e32a61b2581ba9089a2ffb9d365533b5d6ee3c134ed50f6745b10017a
+      - OIDC_REDIRECT_URI=https://play.grfns.com/api/oauth/openid
+      - OIDC_SERVER_APPLICATION_URL=https://auth.grfns.com
+    volumes:
+      - /Volumes/MediaStorage/Games:/romm/library
+      - ./assets:/romm/assets
+      - ./config:/romm/config
+      - ./logs:/romm/logs
+    ports:
+      - "127.0.0.1:8998:8080"
+    depends_on:
+      romm-db:
+        condition: service_healthy
+    networks:
+      - romm-net
+
+networks:
+  romm-net:
+    driver: bridge

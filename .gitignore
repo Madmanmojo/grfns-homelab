@@ -1,0 +1,30 @@
+# ── Secrets — NEVER commit these ──────────────────────────────
+.env
+*.env
+*.key
+*.pem
+*.p12
+*.pfx
+
+# ── Authelia sensitive config ──────────────────────────────────
+authelia/config/db/
+authelia/config/notification.txt
+authelia/config/authelia.log
+
+# ── App data / databases / logs ───────────────────────────────
+romm/db/
+romm/assets/
+romm/logs/
+stash/
+arr-stack/config/
+*.db
+*.db-shm
+*.db-wal
+*.pid
+*.txt
+logs/
+Sentry/
+asp/
+
+# ── OS noise ───────────────────────────────────────────────────
+.DS_Store

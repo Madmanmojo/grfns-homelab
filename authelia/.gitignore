@@ -1,0 +1,4 @@
+.env
+config/db/
+config/notification.txt
+config/authelia.log
