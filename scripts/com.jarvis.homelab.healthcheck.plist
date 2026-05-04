@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+LaunchAgent: runs healthcheck every 15 minutes, sends macOS notification on failure.
+
+Install with:
+  cp ~/docker/scripts/com.jarvis.homelab.healthcheck.plist ~/Library/LaunchAgents/
+  launchctl load ~/Library/LaunchAgents/com.jarvis.homelab.healthcheck.plist
+
+Verify:
+  launchctl list | grep homelab
+
+Logs:
+  tail -f ~/docker/scripts/.healthcheck.log
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.jarvis.homelab.healthcheck</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/jarvis/docker/scripts/healthcheck.sh</string>
+        <string>--quiet</string>
+        <string>--notify</string>
+    </array>
+
+    <key>StartInterval</key>
+    <integer>900</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/jarvis/docker/scripts/.healthcheck.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/jarvis/docker/scripts/.healthcheck.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>

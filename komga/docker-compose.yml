@@ -10,7 +10,7 @@ services:
     environment:
       - TZ=America/New_York
     ports:
-      - "127.0.0.1:25600:25600"
+      - "0.0.0.0:25600:25600"
     volumes:
       - /Users/jarvis/.komga/config:/config
       - /Users/jarvis/.komga/data:/data

@@ -58,6 +58,19 @@ services:
   #   networks:
   #     - arr-network
 
+  kapowarr:
+    image: mrcas/kapowarr:latest
+    container_name: kapowarr
+    restart: unless-stopped
+    ports:
+      - "7595:5656"
+    volumes:
+      - /Users/jarvis/.kapowarr:/app/db
+      - /Volumes/MediaStorage/Comics:/comics:rw
+      - /Volumes/MediaStorage/syncthing-incoming/Media:/import:rw
+    networks:
+      - arr-network
+
   jellyseerr:
     image: fallenbagel/jellyseerr:latest
     container_name: jellyseerr
@@ -71,6 +84,18 @@ services:
       - "127.0.0.1:5055:5055"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    networks:
+      - arr-network
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    environment:
+      - LOG_LEVEL=info
+      - TZ=America/New_York
+    ports:
+      - "127.0.0.1:8191:8191"
     restart: unless-stopped
     networks:
       - arr-network
