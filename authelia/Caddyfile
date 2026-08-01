@@ -64,6 +64,7 @@
     # ── Foundry VTT ──────────────────────────────────────────
     @dnd host dnd.grfns.com
     handle @dnd {
+        import authelia_auth
         reverse_proxy host.docker.internal:30000 {
             header_up Host {host}
             header_up X-Forwarded-For {remote_host}
