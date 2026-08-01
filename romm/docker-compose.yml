@@ -1,6 +1,12 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   romm-db:
-    image: mariadb:latest
+    image: mariadb:11  # pinned major
     container_name: romm-db
     restart: unless-stopped
     environment:
@@ -17,6 +23,11 @@ services:
       retries: 5
     networks:
       - romm-net
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   romm:
     image: rommapp/romm:latest
@@ -33,7 +44,7 @@ services:
       - OIDC_ENABLED=true
       - OIDC_PROVIDER=authelia
       - OIDC_CLIENT_ID=romm
-      - OIDC_CLIENT_SECRET=9df37c4e32a61b2581ba9089a2ffb9d365533b5d6ee3c134ed50f6745b10017a
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
       - OIDC_REDIRECT_URI=https://play.grfns.com/api/oauth/openid
       - OIDC_SERVER_APPLICATION_URL=https://auth.grfns.com
     volumes:
@@ -48,6 +59,17 @@ services:
         condition: service_healthy
     networks:
       - romm-net
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
 networks:
   romm-net:

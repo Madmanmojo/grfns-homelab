@@ -1,6 +1,12 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   radarr-mac:
-    image: ghcr.io/linuxserver/radarr:latest
+    image: ghcr.io/linuxserver/radarr:latest  # linuxserver doesn't tag major versions; pin via digest later if stability matters
     container_name: radarr-mac
     environment:
       - PUID=501  # Your Mac user ID (jarvis)
@@ -8,18 +14,20 @@ services:
       - TZ=America/New_York
       - UMASK=002
     volumes:
-      - /Volumes/Orange/docker/arr-stack/config/radarr:/config
+      - ./data/radarr:/config
       - /Volumes/MediaStorage/Movies:/movies  # RW so Radarr can write metadata/links
       - /Volumes/MediaStorage:/media  # RW for future needs
+      - ./scripts/install-ffmpeg.sh:/custom-cont-init.d/install-ffmpeg.sh:ro
     ports:
-      - "7878:7878"  # Mac Radarr on 7878 (seedbox uses 7879 via tunnel)
-    restart: unless-stopped
+      - "127.0.0.1:7878:7878"  # loopback only — public access via Caddy/Authelia
+    restart: unless-stopped  # kept off until pipeline finishes copying to MediaStorage
     networks:
       - arr-network
-    # Install ffmpeg on container startup (needed for media parsing)
-    command: >
-      sh -c "apk add --no-cache ffmpeg > /dev/null 2>&1 || true &&
-             /init"
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
   sonarr-mac:
     image: ghcr.io/linuxserver/sonarr:latest
@@ -30,46 +38,37 @@ services:
       - TZ=America/New_York
       - UMASK=002
     volumes:
-      - /Volumes/Orange/docker/arr-stack/config/sonarr:/config
+      - ./data/sonarr:/config
       - /Volumes/MediaStorage/TV:/tv  # RW
       - /Volumes/MediaStorage:/media  # RW
     ports:
-      - "8989:8989"  # Mac Sonarr on 8989 (seedbox uses 8990 via tunnel)
-    restart: unless-stopped
+      - "127.0.0.1:8989:8989"  # loopback only
+    restart: unless-stopped  # kept off until pipeline finishes copying to MediaStorage
     networks:
       - arr-network
-
-  # Whisparr - commented out due to registry issues, can be added later
-  # whisparr-mac:
-  #   image: ghcr.io/linuxserver/whisparr:latest
-  #   container_name: whisparr-mac
-  #   environment:
-  #     - PUID=501
-  #     - PGID=20
-  #     - TZ=America/New_York
-  #     - UMASK=002
-  #   volumes:
-  #     - /Volumes/Orange/docker/arr-stack/config/whisparr:/config
-  #     - /Volumes/MediaStorage/Adult:/adult:ro
-  #     - /Volumes/MediaStorage:/media:ro
-  #   ports:
-  #     - "6969:6969"  # Mac Whisparr on 6969 (seedbox uses 6970 via tunnel)
-  #   restart: unless-stopped
-  #   networks:
-  #     - arr-network
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
   kapowarr:
     image: mrcas/kapowarr:latest
     container_name: kapowarr
     restart: unless-stopped
     ports:
-      - "7595:5656"
+      - "127.0.0.1:7595:5656"  # loopback only
     volumes:
       - /Users/jarvis/.kapowarr:/app/db
       - /Volumes/MediaStorage/Comics:/comics:rw
       - /Volumes/MediaStorage/syncthing-incoming/Media:/import:rw
     networks:
       - arr-network
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
   jellyseerr:
     image: fallenbagel/jellyseerr:latest
@@ -79,7 +78,7 @@ services:
       - PGID=20
       - TZ=America/New_York
     volumes:
-      - /Volumes/Orange/docker/arr-stack/config/jellyseerr:/app/config
+      - ./data/jellyseerr:/app/config
     ports:
       - "127.0.0.1:5055:5055"
     extra_hosts:
@@ -87,18 +86,76 @@ services:
     restart: unless-stopped
     networks:
       - arr-network
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
-  flaresolverr:
-    image: ghcr.io/flaresolverr/flaresolverr:latest
-    container_name: flaresolverr
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
     environment:
-      - LOG_LEVEL=info
+      - PUID=501
+      - PGID=20
       - TZ=America/New_York
+      - UMASK=002
+    volumes:
+      - /Users/jarvis/.config/bazarr:/config
+      - /Volumes/MediaStorage/TV:/tv
+      - /Volumes/MediaStorage/Movies:/movies
     ports:
-      - "127.0.0.1:8191:8191"
+      - "127.0.0.1:6767:6767"
     restart: unless-stopped
     networks:
       - arr-network
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      - PUID=501
+      - PGID=20
+      - TZ=America/New_York
+      - UMASK=002
+    volumes:
+      - /Users/jarvis/.config/prowlarr:/config
+    ports:
+      - "127.0.0.1:9696:9696"
+    restart: unless-stopped
+    networks:
+      - arr-network
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  unpackarr:
+    image: ghcr.io/unpackerr/unpackerr:latest
+    container_name: unpackarr
+    environment:
+      - PUID=501
+      - PGID=20
+      - TZ=America/New_York
+    volumes:
+      - /Users/jarvis/.config/unpackarr:/config
+      - /Volumes/MediaStorage/syncthing-incoming:/downloads
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+    networks:
+      - arr-network
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
 networks:
   arr-network:

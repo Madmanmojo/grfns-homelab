@@ -1,0 +1,67 @@
+# Calibre - headless library manager (admin GUI via noVNC)
+# Calibre-Web - reader-facing UI + OPDS feed (KOReader on Boox X4)
+# Library home: ${LIBRARY_PATH} (.env; internal SSD now, MediaStorage later)
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+
+  calibre:
+    image: lscr.io/linuxserver/calibre:latest
+    container_name: calibre
+    restart: unless-stopped
+    environment:
+      - PUID=501
+      - PGID=20
+      - TZ=America/New_York
+      - PASSWORD=${CALIBRE_PASSWORD}
+      - TITLE=Calibre
+    ports:
+      - "127.0.0.1:8090:8080"
+      - "127.0.0.1:8091:8181"
+      - "127.0.0.1:8092:8182"
+    volumes:
+      - /Users/jarvis/.calibre/config:/config
+      - ${LIBRARY_PATH}:/library
+      - /Users/jarvis/docker/calibre/calibre-server-init.sh:/custom-cont-init.d/calibre-server.sh:ro
+    networks:
+      - calibre-net
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
+  calibre-web:
+    image: lscr.io/linuxserver/calibre-web:latest
+    container_name: calibre-web
+    restart: unless-stopped
+    depends_on:
+      - calibre
+    environment:
+      - PUID=501
+      - PGID=20
+      - TZ=America/New_York
+      - DOCKER_MODS=linuxserver/mods:universal-calibre
+      - OAUTHLIB_RELAX_TOKEN_SCOPE=1
+    ports:
+      - "127.0.0.1:8083:8083"
+    volumes:
+      - /Users/jarvis/.calibre-web/config:/config
+      - ${LIBRARY_PATH}:/books
+    networks:
+      - calibre-net
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+networks:
+  calibre-net:
+    name: calibre_default
+    driver: bridge

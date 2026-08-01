@@ -61,6 +61,30 @@
         }
     }
 
+    # ── Foundry VTT ──────────────────────────────────────────
+    @dnd host dnd.grfns.com
+    handle @dnd {
+        reverse_proxy host.docker.internal:30000 {
+            header_up Host {host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    # ── Calibre-Web ──────────────────────────────────────────
+    @books host books.grfns.com
+    handle @books {
+        import authelia_auth
+        reverse_proxy host.docker.internal:8083
+    }
+
+    # ── Audiobookshelf ───────────────────────────────────────
+    @audio host audio.grfns.com
+    handle @audio {
+        import authelia_auth
+        reverse_proxy host.docker.internal:13378
+    }
+
     # ── Authelia portal — direct, no forward auth ────────────
     @auth host auth.grfns.com
     handle @auth {

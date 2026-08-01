@@ -1,0 +1,29 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  dnd-wiki:
+    build: ./quartz
+    container_name: dnd-wiki
+    restart: unless-stopped
+    volumes:
+      - /Users/jarvis/Projects/gaming recaps/wiki:/content:ro
+    ports:
+      - "127.0.0.1:4040:8080"
+    logging: *default-logging
+
+  dnd-bot:
+    build: ./dnd-bot
+    container_name: dnd-bot
+    restart: unless-stopped
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - DISCORD_GUILD_ID=${DISCORD_GUILD_ID}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - DATA_DIR=/app/data
+    volumes:
+      - /Users/jarvis/Projects/gaming recaps:/app/data:ro
+    logging: *default-logging

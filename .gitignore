@@ -15,6 +15,7 @@
 **/db/
 **/assets/
 **/logs/
+audiobookshelf/metadata/
 authelia/config/db/
 authelia/config/notification.txt
 authelia/config/authelia.log

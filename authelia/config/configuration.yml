@@ -43,11 +43,12 @@ storage:
     path: /config/db/authelia.db
 
 notifier:
-  # Writes verification codes/reset links to a local file.
-  # Read with: cat /Users/jarvis/docker/authelia/config/notification.txt
-  # Upgrade to SMTP later for email delivery.
-  filesystem:
-    filename: /config/notification.txt
+  smtp:
+    address: smtp://smtp.resend.com:587
+    username: resend
+    sender: "grfns.com <noreply@grfns.com>"
+    subject: "{title}"
+    startup_check_address: tim@grfns.com
 
 identity_providers:
   oidc:
@@ -189,17 +190,36 @@ access_control:
         - "requests.grfns.com"
         - "media.grfns.com"
         - "play.grfns.com"
+        - "dnd.grfns.com"
+        - "audio.grfns.com"
+        - "books.grfns.com"
       subject: "group:admins"
       policy: one_factor
 
-    # Friends group — can watch and request, not play or read
+    # Friends — watch, request, comics, games, dnd, audiobooks
     - domain:
         - "watch.grfns.com"
         - "requests.grfns.com"
+        - "read.grfns.com"
+        - "play.grfns.com"
+        - "dnd.grfns.com"
+        - "audio.grfns.com"
       subject: "group:friends"
       policy: one_factor
 
-    # Readers group — comics only
+    # Family — watch only, no requesting
+    - domain: "watch.grfns.com"
+      subject: "group:family"
+      policy: one_factor
+
+    # Books — friends + readers
+    - domain: "books.grfns.com"
+      subject:
+        - "group:friends"
+        - "group:readers"
+      policy: one_factor
+
+    # Readers group — comics only (legacy, kept for granular access)
     - domain: "read.grfns.com"
       subject: "group:readers"
       policy: one_factor
