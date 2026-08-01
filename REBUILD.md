@@ -2,51 +2,38 @@
 
 What to do after replacing the Mac's internal drive, doing a fresh macOS install, or restoring from Time Machine.
 
-> **The lesson from 2026-05-04**: Time Machine **does not back up Docker.raw** (Docker excludes its own VM disk by default). Your containers and images are NOT in TM. The reason this stack is recoverable is because the VM lives on Orange (`/Volumes/Orange/docker/vm/DockerDesktop/Docker.raw`), which survives Mac rebuilds.
+> **Docker VM is now on the internal 1 TB drive** (as of 2026-05-13, migrated from Orange). Time Machine **does not back up Docker.raw** (Docker excludes it by default). Containers and images are NOT in TM. This is fine — all configs are bind-mounted to `~/docker/*/` which IS backed up. After a rebuild, just install Docker Desktop fresh and `docker compose up -d` to re-pull images and start.
 
 ## Prerequisites
 
 - macOS reinstalled, signed in as `jarvis`
-- All external drives mounted: Orange, MediaStorage, Big Silver
+- MediaStorage mounted (required for TV/Movies/Comics/Games volumes)
 - Homebrew installed (it should survive TM restore; if not, `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`)
 - Docker Desktop installed fresh from https://desktop.docker.com/mac/main/arm64/Docker.dmg (drag to /Applications)
 - This repo cloned to `~/docker/` from GitHub
 
 ## The rebuild — step by step
 
-### 1. Re-attach the existing Docker VM
+### 1. Start Docker Desktop
 
-After installing Docker Desktop, **DO NOT open it yet.** First, replace the new empty VM disk with a symlink to the one on Orange.
+Open Docker Desktop from Applications. The whale icon appears in the menu bar. Docker will create a fresh VM on the internal drive automatically — no symlink needed.
+
+After ~30 seconds Docker is ready. All images need to be re-pulled (step 2), but all config is in `~/docker/*/` via bind mounts so nothing is lost.
+
+### 2. Pull images and bring up all stacks
 
 ```bash
-# Confirm the Orange Docker.raw is there
-ls -lh /Volumes/Orange/docker/vm/DockerDesktop/Docker.raw
-
-# Quit Docker Desktop if you accidentally opened it (menu bar → Quit Docker Desktop, wait for whale icon to vanish)
-
-# Remove the empty new Docker.raw and symlink to Orange
-rm "/Users/jarvis/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw"
-ln -s "/Volumes/Orange/docker/vm/DockerDesktop/Docker.raw" \
-      "/Users/jarvis/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw"
-
-# Verify
-ls -la "/Users/jarvis/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw"
-# Should show: Docker.raw -> /Volumes/Orange/docker/vm/DockerDesktop/Docker.raw
+# Pull all images and start each stack
+for stack in arr-stack stash romm komga authelia; do
+  echo "=== $stack ==="
+  cd ~/docker/$stack && docker compose pull && docker compose up -d
+done
 ```
-
-> **DO NOT** use Docker Desktop's "Disk image location" UI to point at Orange — it triggers a "Move disk image?" dialog that will overwrite your existing 1 TB Docker.raw with the empty new one. Use the symlink approach above. (This is also documented in `arr-stack/ORANGE_DRIVE_SETUP.md`.)
-
-### 2. Start Docker Desktop
-
-Open Docker Desktop from Applications. The whale icon appears in menu bar. After ~30 seconds, all containers from the old VM should appear in the Containers tab — most will be "Running" because of `restart: unless-stopped`.
 
 **Sanity check:**
 ```bash
-docker ps | wc -l    # should be ~16-20
-docker images | wc -l  # should be many
+docker ps --format "{{.Names}}\t{{.Status}}"  # all should be "Up"
 ```
-
-If containers DIDN'T come back: the symlink didn't take, or Docker version changed too much. Check `~/Library/Containers/com.docker.docker/Data/log/host/com.docker.backend.log` for errors.
 
 ### 3. Install and start native services
 
@@ -91,14 +78,60 @@ ls ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/com.jarvis.macradarrsync.plist
 ```
 
-### 5. Bring up the seedbox tunnel
+### 5. media-center-ai (the dashboard)
+
+Not a `~/docker` stack — it's its own repo, run bare-metal via launchd (not Docker), at `~/Projects/media-center-ai`.
+
+```bash
+# Clone
+git clone https://github.com/Madmanmojo/media-center-ai.git ~/Projects/media-center-ai
+cd ~/Projects/media-center-ai
+git checkout main   # dev is the integration branch — check it too if the old Mac is
+                     # still reachable, it may have unmerged work worth pulling over first
+
+# Symlink — the Claude Code MCP server registration (~/.claude/settings.json,
+# entry "media-center-ai") points at ~/media-center-ai, not ~/Projects/media-center-ai
+ln -s ~/Projects/media-center-ai ~/media-center-ai
+
+# venv + deps
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Secrets — same as any other stack's .env
+cp .env.example .env
+# Fill in from your password manager: TMDB, Sonarr, Radarr, Jellyfin, SABnzbd,
+# Komga, OMDb, Prowlarr, Audiobookshelf, Stash, qBittorrent, Syncthing (x2 —
+# native Mac instance + the seedbox's), Telegram bot token/chat id.
+```
+
+**Restore the databases.** Unlike everything above, this app's state isn't in git — it's two SQLite files at `~/.media-center-ai/` (`media_library.db`, `scheduler.db`), backed up only by Time Machine.
+
+- If TM restored `~/.media-center-ai/` intact: nothing else to do, skip ahead.
+- If it's genuinely gone (TM also lost, e.g. drive replaced with no TM restore): the app recreates empty tables on next startup automatically (`database.py`/`scheduler.py`'s `_initialize_database()`), so it won't crash — but historical duplicate-scan groups, quality-audit history, and scheduled-task run counts are gone for good. The actual media library metadata isn't lost, though: run a fresh `scan_library` (dashboard or MCP tool) to repopulate `episodes`/`movies` from what's really on `/Volumes/MediaStorage`. This has happened before — see `~/.media-center-ai/media_library.db.corrupted_backup` + `recovered_data.sql` from the January 2026 corruption incident if you need a reference for what hand-recovery looked like.
+
+**Launchd:**
+```bash
+# com.jarvis.media-center-ai.plist runs `venv/bin/python3 web_server.py` at boot.
+# Same caveat as step 4 — LaunchAgents sometimes don't survive a TM restore.
+ls ~/Library/LaunchAgents/com.jarvis.media-center-ai.plist || echo "MISSING — recreate from grfns-homelab or media-center-ai repo docs"
+launchctl load ~/Library/LaunchAgents/com.jarvis.media-center-ai.plist
+```
+
+**Verify:**
+```bash
+curl -s http://localhost:8000/api/health
+cd ~/Projects/media-center-ai && make test   # 7 tests, should all pass
+```
+
+### 6. Bring up the seedbox tunnel
 
 The Mac arr stack needs to reach the seedbox at `10.10.10.1` (VPN address).
 
 - Open `~/Projects/media-automation/active/seedbox/Launch_Tunnel_Menubar.app`
 - Or run `~/Projects/media-automation/active/seedbox/start_tunnels.sh` directly
 
-### 6. Verify end-to-end
+### 7. Verify end-to-end
 
 The single most useful check — open `https://watch.grfns.com` in any browser:
 
@@ -112,7 +145,7 @@ Then spot-check the others:
 - `https://play.grfns.com` → Romm
 - `https://media.grfns.com` → media-center-ai
 
-### 7. Run the health check
+### 8. Run the health check
 
 ```bash
 ~/docker/scripts/healthcheck.sh
@@ -122,7 +155,7 @@ Should print all green. If any fail, troubleshoot that one service.
 
 ## Common rebuild issues
 
-**"Docker shows empty containers list"** → symlink wasn't created or Docker started before the symlink existed. Quit Docker, redo step 1.
+**"Docker shows empty containers list"** → normal after a fresh install. Run step 2 to pull images and bring stacks up.
 
 **"Containers running but `*.grfns.com` doesn't resolve"** → cloudflared isn't running. `pgrep cloudflared` to check; restart with `sudo launchctl start com.cloudflare.cloudflared`.
 
@@ -134,9 +167,14 @@ Should print all green. If any fail, troubleshoot that one service.
 
 **".env file missing for a stack"** → Restore secrets from your password manager and recreate from `.env.example` template in each stack.
 
+**"media.grfns.com gives 502"** → media-center-ai's launchd service isn't running, or port 8000 isn't bound. `launchctl list | grep media-center-ai` to check; `curl localhost:8000/api/health` to confirm the app itself is even up before blaming the tunnel.
+
+**"media-center-ai starts but the dashboard shows no library data"** → `~/.media-center-ai/media_library.db` is missing or empty (didn't survive the rebuild). See step 5 — run a fresh library scan to repopulate it; historical scan/duplicate-audit records won't come back, but current media on disk will.
+
 ## What NOT to do
 
-- ❌ Don't trust Time Machine alone for Docker. It excludes Docker.raw.
-- ❌ Don't use Docker Desktop's UI to change "Disk image location" when an existing VM is at the destination. Use the symlink approach.
-- ❌ Don't `rm -rf ~/docker/*/config/` thinking they're stale — those bind-mount dirs ARE the live service state.
+- ❌ Don't trust Time Machine alone for Docker images — Docker.raw is excluded from TM. Re-pull images on rebuild.
+- ❌ Don't use Docker Desktop's UI to change "Disk image location" — it triggers a destructive overwrite. The default location on internal is correct.
+- ❌ Don't `rm -rf ~/docker/*/data/` or `~/docker/*/config/` thinking they're stale — those bind-mount dirs ARE the live service state.
 - ❌ Don't commit `.env` files to git. Use `.env.example` templates.
+- ❌ Don't assume `~/.media-center-ai/` is disposable cache and skip restoring it — `media_library.db`/`scheduler.db` there are the app's actual state, not in git, and only exist via Time Machine.
