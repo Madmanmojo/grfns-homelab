@@ -2,6 +2,8 @@
 
 What to do after replacing the Mac's internal drive, doing a fresh macOS install, or restoring from Time Machine.
 
+> **If you're reading this from a phone with no laptop**, the Jarvis vault's Wiki (Obsidian, synced via iCloud Drive — see media-center-ai's `JARVIS_VAULT_PATH`) has a narrative Disaster-Recovery page meant to be read exactly like this, without needing a terminal in front of you. This file stays as the precise, copy-pasteable command reference; the vault's version explains the *why* and is easier to read one-handed.
+
 > **Docker VM is now on the internal 1 TB drive** (as of 2026-05-13, migrated from Orange). Time Machine **does not back up Docker.raw** (Docker excludes it by default). Containers and images are NOT in TM. This is fine — all configs are bind-mounted to `~/docker/*/` which IS backed up. After a rebuild, just install Docker Desktop fresh and `docker compose up -d` to re-pull images and start.
 
 ## Prerequisites
