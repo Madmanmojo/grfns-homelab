@@ -112,10 +112,27 @@ cp .env.example .env
 
 **Launchd:**
 ```bash
-# com.jarvis.media-center-ai.plist runs `venv/bin/python3 web_server.py` at boot.
 # Same caveat as step 4 — LaunchAgents sometimes don't survive a TM restore.
-ls ~/Library/LaunchAgents/com.jarvis.media-center-ai.plist || echo "MISSING — recreate from grfns-homelab or media-center-ai repo docs"
-launchctl load ~/Library/LaunchAgents/com.jarvis.media-center-ai.plist
+# If missing, copy the tracked source of truth from the repo — do NOT
+# hand-recreate this one. It carries EnvironmentVariables (PATH,
+# PYTHONUNBUFFERED) that are load-bearing, not cosmetic: without PATH
+# including /opt/homebrew/bin, any subprocess call that shells out to a
+# Homebrew tool (e.g. ffmpeg, used by Jarvis's voice-note transcription)
+# fails with FileNotFoundError — this happened for real on 2026-08-02,
+# worked fine in every interactive terminal test, only broke under
+# launchd because launchd's default PATH is just /usr/bin:/bin:/usr/sbin:
+# /sbin. Without PYTHONUNBUFFERED, stdout is block-buffered when
+# redirected to the log file, so print()-based error messages can sit
+# invisible for a long time — actively hid the root cause of that same
+# incident until it was set.
+cp ~/Projects/media-center-ai/launchd/com.jarvis.media-center-ai.plist ~/Library/LaunchAgents/
+launchctl load -w ~/Library/LaunchAgents/com.jarvis.media-center-ai.plist
+# NB: `launchctl bootstrap` failed with a transient "Input/output error"
+# during initial testing, immediately after `bootout` on this exact plist,
+# even though the file was valid (plutil -lint passed) and nothing else
+# was running on port 8000. `launchctl load -w` (the older API) worked on
+# the first try both times this was hit. If bootstrap fails here, don't
+# assume the plist is broken — try `load -w` instead before debugging further.
 ```
 
 **Verify:**
