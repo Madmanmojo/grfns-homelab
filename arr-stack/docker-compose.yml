@@ -90,7 +90,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 2G
 
   bazarr:
     image: lscr.io/linuxserver/bazarr:latest

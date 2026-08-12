@@ -2,6 +2,14 @@
 # Sits between Cloudflare tunnel (port 80) and all apps
 # Forward auth via Authelia for all protected routes
 
+{
+    # The :80 block below already owns port 80 for the Cloudflare Tunnel
+    # path. Without this, Caddy tries to add its own auto-redirect
+    # listener on :80 for the named-host :443 block, which would race
+    # the existing one for the same port in the same process.
+    auto_https disable_redirects
+}
+
 (authelia_auth) {
     forward_auth authelia:9091 {
         uri /api/authz/forward-auth
@@ -95,6 +103,90 @@
     }
 
     # Catch-all — reject unmatched hostnames
+    handle {
+        respond 404
+    }
+}
+
+# ── LAN-direct HTTPS ─────────────────────────────────────────
+# Separate from the :80 block above (which stays exactly as-is for the
+# Cloudflare Tunnel). This block gets real certs via Cloudflare's DNS-01
+# challenge, so LAN clients pointed here by split-horizon DNS get working
+# HTTPS without a round trip through Cloudflare's edge.
+watch.grfns.com, read.grfns.com, requests.grfns.com, media.grfns.com, play.grfns.com, dnd.grfns.com, books.grfns.com, audio.grfns.com, auth.grfns.com {
+    tls {
+        dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+    }
+
+    @watch_api {
+        host watch.grfns.com
+        header Authorization MediaBrowser*
+    }
+    handle @watch_api {
+        reverse_proxy host.docker.internal:8096
+    }
+
+    @watch host watch.grfns.com
+    handle @watch {
+        import authelia_auth
+        reverse_proxy host.docker.internal:8096
+    }
+
+    @read host read.grfns.com
+    handle @read {
+        import authelia_auth
+        reverse_proxy host.docker.internal:25600
+    }
+
+    @requests host requests.grfns.com
+    handle @requests {
+        import authelia_auth
+        reverse_proxy host.docker.internal:5055
+    }
+
+    @media host media.grfns.com
+    handle @media {
+        import authelia_auth
+        reverse_proxy host.docker.internal:8000
+    }
+
+    @play host play.grfns.com
+    handle @play {
+        import authelia_auth
+        reverse_proxy host.docker.internal:8998 {
+            header_down -WWW-Authenticate
+        }
+    }
+
+    @dnd host dnd.grfns.com
+    handle @dnd {
+        import authelia_auth
+        reverse_proxy host.docker.internal:30000 {
+            header_up Host {host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    @books host books.grfns.com
+    handle @books {
+        import authelia_auth
+        reverse_proxy host.docker.internal:8083
+    }
+
+    @audio host audio.grfns.com
+    handle @audio {
+        import authelia_auth
+        reverse_proxy host.docker.internal:13378
+    }
+
+    @auth host auth.grfns.com
+    handle @auth {
+        reverse_proxy authelia:9091 {
+            header_up X-Forwarded-Proto https
+        }
+    }
+
     handle {
         respond 404
     }
