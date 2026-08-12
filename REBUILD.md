@@ -67,6 +67,11 @@ which syncthing || brew install syncthing
 brew services start syncthing
 ```
 
+#### Foundry VTT (native, not Docker)
+`dnd.grfns.com` routes to this directly on port 30000 — the `dnd/` docker stack
+(dnd-wiki, dnd-bot) is separate and doesn't include it. Reinstall/relaunch
+Foundry and confirm it's listening on :30000 before dnd.grfns.com will work.
+
 ### 4. Re-link LaunchAgents
 
 Some custom launchd jobs may not survive the rebuild (`~/Library/LaunchAgents/` is sometimes missed). Check and re-load:

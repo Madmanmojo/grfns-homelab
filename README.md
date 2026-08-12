@@ -28,17 +28,20 @@ Self-hosted media + automation stack running on a Mac mini (`JARVIS`).
    • media-center-ai
 ```
 
-**Source of truth for downloads is the SEEDBOX** (`10.10.10.1` via VPN) — the Mac stack only verifies what's local and updates the seedbox arr DB.
+**Source of truth for downloads is the SEEDBOX** (`10.7.0.1` via WireGuard) — the Mac stack only verifies what's local and updates the seedbox arr DB.
 
 ## Stacks (all in this repo, all `docker compose up -d`-able)
 
 | Stack | Containers | Purpose |
 |---|---|---|
-| `arr-stack/` | radarr-mac, sonarr-mac, kapowarr, flaresolverr, jellyseerr, bazarr | Library verification, request management, comics download |
-| `komga/` | komga, komf | Comics server (OPDS for Panels) + metadata fetcher |
-| `stash/` | stash | Adult content manager (with AI plugins) |
+| `arr-stack/` | radarr-mac, sonarr-mac, kapowarr, prowlarr, unpackarr, jellyseerr, bazarr | Library verification, request management, comics download |
+| `komga/` | komga | Comics server (OPDS for Panels) |
+| `stash/` | stash, stash-ai-server | Adult content manager (with AI plugins) |
 | `romm/` | romm, romm-db | Retro game manager (MariaDB backend) |
 | `authelia/` | lldap, authelia, caddy | SSO + reverse proxy for everything |
+| `audiobookshelf/` | audiobookshelf | Audiobook/podcast server |
+| `calibre/` | calibre, calibre-web | Ebook management + web reader |
+| `dnd/` | dnd-wiki, dnd-bot | D&D campaign wiki + Discord bot |
 
 ## Service inventory
 
@@ -47,11 +50,11 @@ Self-hosted media + automation stack running on a Mac mini (`JARVIS`).
 | Radarr (Mac) | 7878 | http://localhost:7878 | — | arr-stack | MediaStorage mounted |
 | Sonarr (Mac) | 8989 | http://localhost:8989 | — | arr-stack | MediaStorage mounted |
 | Kapowarr | 5656 (host 7595) | http://localhost:7595 | — | arr-stack | MediaStorage, ~/.kapowarr |
-| FlareSolverr | 8191 | http://localhost:8191 | — | arr-stack | (used by Prowlarr indexers) |
+| Prowlarr | 9696 | http://localhost:9696 | — | arr-stack | (indexer manager for sonarr/radarr) |
+| Unpackarr | — | — | — | arr-stack | (background extraction helper) |
 | Jellyseerr | 5055 | http://localhost:5055 | https://requests.grfns.com | arr-stack | seedbox arr APIs |
 | Bazarr | 6767 | http://localhost:6767 | — | arr-stack | MediaStorage |
 | Komga | 25600 | http://localhost:25600 | https://read.grfns.com | komga | /Volumes/Orange/Comics |
-| Komf | 8085 (host 3801) | http://localhost:3801 | — | komga | komga |
 | Stash | 9999 | http://localhost:9999 | — | stash | /Volumes/MediaStorage/Adult, Orange/docker/stash/config |
 | Romm | 8080 (host 8998) | http://localhost:8998 | https://play.grfns.com | romm | romm-db, MediaStorage/Games |
 | LLDAP | 17170 | http://localhost:17170 | — | authelia | (none) |
@@ -59,6 +62,12 @@ Self-hosted media + automation stack running on a Mac mini (`JARVIS`).
 | Caddy | 80 | http://localhost:80 | (the tunnel routes here) | authelia | authelia, all upstream services, Jellyfin native |
 | Jellyfin (native) | 8096 | http://localhost:8096 | https://watch.grfns.com | — | `/Applications/Jellyfin.app` |
 | media-center-ai | 8000 | http://localhost:8000 | https://media.grfns.com | media-center-ai | sonarr, radarr, jellyfin, komga APIs |
+| Audiobookshelf | 13378 | http://localhost:13378 | https://audio.grfns.com | audiobookshelf | MediaStorage/Audiobooks |
+| Calibre | 8080 (host 8090) | http://localhost:8090 | — | calibre | MediaStorage/Books |
+| Calibre-Web | 8083 | http://localhost:8083 | https://books.grfns.com | calibre | calibre's library |
+| dnd-wiki | 8080 (host 4040) | http://localhost:4040 | — | dnd | (Foundry VTT itself is a separate native process, not this container) |
+| dnd-bot | — | — | — | dnd | Discord bot, no HTTP port |
+| Foundry VTT (native) | 30000 | http://localhost:30000 | https://dnd.grfns.com | — | native process, not Docker — not in REBUILD.md's boot order, should be added |
 
 ## Cloudflare tunnel routes
 
@@ -74,6 +83,9 @@ Credentials: `~/.cloudflared/8ee747de-...json` + `~/.cloudflared/cert.pem`
 | `requests.grfns.com` | jellyseerr :5055 | Authelia |
 | `media.grfns.com` | media-center-ai :8000 | Authelia |
 | `play.grfns.com` | romm :8998 | Authelia |
+| `dnd.grfns.com` | Foundry VTT (native) :30000 | Authelia |
+| `books.grfns.com` | calibre-web :8083 | Authelia |
+| `audio.grfns.com` | audiobookshelf :13378 | Authelia |
 
 ## Where things live
 
