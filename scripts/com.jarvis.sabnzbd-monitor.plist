@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+Moved off crontab 2026-08-21: cron-invoked runs of this script were
+producing false "Seedbox not reachable over WireGuard" failures on every
+single 5-minute run (7,364 consecutive false negatives logged over ~25
+days), while the identical command succeeded immediately when run
+interactively or via launchd. Root cause not fully isolated, but launchd
+is the same mechanism the main homelab healthcheck already uses
+successfully (com.jarvis.homelab.healthcheck.plist) — moving this here
+sidesteps whatever cron-specific environment/permission gap was causing
+the ping check inside check_sabnzbd_health.sh to fail.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.jarvis.sabnzbd-monitor</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/jarvis/bin/sabnzbd_monitor.sh</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>300</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/jarvis/Library/Logs/sabnzbd-monitor-launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/jarvis/Library/Logs/sabnzbd-monitor-launchd.error.log</string>
+</dict>
+</plist>
