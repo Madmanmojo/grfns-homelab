@@ -47,6 +47,7 @@ LOCAL_URLS=(
   "http://127.0.0.1:8989|Sonarr (Mac)"
   "http://127.0.0.1:5055|Jellyseerr (local)"
   "http://127.0.0.1:25600|Komga (local)"
+  "http://127.0.0.1:3801|Komf (local)"
   "http://127.0.0.1:9091|Authelia (local)"
   "http://127.0.0.1:8096|Jellyfin (native)"
   "http://127.0.0.1:8000|media-center-ai (local)"
@@ -124,6 +125,60 @@ else
   fail_count=$((fail_count + 1))
   daemon_fail_count=$((daemon_fail_count + 1))
 fi
+
+# Container resource check — catches a container that's stuck spinning
+# (high CPU/memory, climbing toward its limit) while still answering its
+# HTTP port fine, so the checks above wouldn't see anything wrong. Real
+# incident 2026-08-21: Bazarr sat stuck for ~5 hours with zero new log
+# activity while CPU climbed past 100% and memory climbed from 60% to 71%
+# of its container limit in about a minute — invisible to every check
+# above, found only by manually looking at `docker stats`. Two independent
+# signals, either one alone is too noisy: memory near its container limit
+# (approaching OOM regardless of trend), or memory climbing fast since the
+# last run (state file persists prior mempercent per container to diff
+# against — a single high reading can be a normal burst, but a fast
+# climb between checks 15 minutes apart is not).
+resource_fail_count=0
+[[ $QUIET -eq 0 ]] && echo ""
+[[ $QUIET -eq 0 ]] && echo "Container resources:"
+STATE_FILE="/Users/jarvis/docker/scripts/.container_resource_state"
+declare -A prev_mem
+if [[ -f "$STATE_FILE" ]]; then
+  while IFS='|' read -r cname cmem; do
+    prev_mem["$cname"]="$cmem"
+  done < "$STATE_FILE"
+fi
+
+MEM_LIMIT_ALERT=85    # % of container's own memory limit
+MEM_CLIMB_ALERT=15    # percentage-point jump since last check
+
+: > "${STATE_FILE}.tmp"
+while IFS='|' read -r cname cmem; do
+  cmem_num="${cmem%.*}"
+  echo "${cname}|${cmem_num}" >> "${STATE_FILE}.tmp"
+
+  reason=""
+  if [[ "$cmem_num" -ge "$MEM_LIMIT_ALERT" ]]; then
+    reason="mem ${cmem_num}% of limit"
+  elif [[ -n "${prev_mem[$cname]:-}" ]]; then
+    delta=$(( cmem_num - prev_mem["$cname"] ))
+    if [[ "$delta" -ge "$MEM_CLIMB_ALERT" ]]; then
+      reason="mem climbing ${prev_mem[$cname]}%→${cmem_num}%"
+    fi
+  fi
+
+  if [[ -n "$reason" ]]; then
+    printf "  ✗  %-32s %s\n" "$cname" "($reason)"
+    failures+=("$cname: $reason")
+    failure_names+=("$cname (resource)")
+    fail_count=$((fail_count + 1))
+    resource_fail_count=$((resource_fail_count + 1))
+  else
+    [[ $QUIET -eq 0 ]] && printf "  ✓  %-32s %s\n" "$cname" "(mem ${cmem_num}%)"
+  fi
+done < <(docker stats --no-stream --format '{{.Name}}|{{.MemPerc}}' 2>/dev/null)
+mv "${STATE_FILE}.tmp" "$STATE_FILE"
+[[ $resource_fail_count -eq 0 ]] && ok_count=$((ok_count + 1))
 
 [[ $QUIET -eq 0 ]] && echo ""
 [[ $QUIET -eq 0 ]] && echo "Summary: $ok_count OK, $fail_count FAIL"

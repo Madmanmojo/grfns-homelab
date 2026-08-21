@@ -62,3 +62,4 @@ Icon?
 
 # ── Health check log ──────────────────────────────────────────
 scripts/.healthcheck.log
+scripts/.container_resource_state
